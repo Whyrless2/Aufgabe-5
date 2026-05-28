@@ -1,4 +1,5 @@
 ﻿# ---------------------------------------------------------
+# ---------------------------------------------------------
 # FE-Stabwerksprogramm (Aufgabe 5)
 # Bearbeiter: Gabriel Pyka, Leonard Jaufmann, Martin Renner, Daniel Ryvkin
 # ---------------------------------------------------------
@@ -8,6 +9,7 @@ from tkinter import ttk
 from tkinter import filedialog as fd
 from tkinter import messagebox
 import csv
+import traceback
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np # HINZUGEFÜGT: Numerik-Bibliothek für die Matrizenrechnung
@@ -377,6 +379,7 @@ def sichere_aktion(status_label, aktion, beschreibung):
     try:
         aktion()
     except Exception as e:
+        traceback.print_exc()  # Prints the full stack trace to the terminal for developers
         meldung = f"{beschreibung}: {str(e)}"
         status_label.config(text=f"Status: Fehler! {meldung}")
         messagebox.showerror("Programmfehler", meldung)
@@ -481,6 +484,11 @@ def berechne_plot_grenzen(system, ueberhoehung):
         n_id, _, _ = lager
         if n_id in system.get('knoten', {}):
             kx, ky = system['knoten'][n_id]
+            
+            if system.get('berechnet', False) and 'verschiebungen' in system:
+                u = system['verschiebungen']
+                kx += (u[(n_id - 1) * 2] / 1000) * ueberhoehung
+                ky += (u[(n_id - 1) * 2 + 1] / 1000) * ueberhoehung
             x_vals.extend([kx - 1.2, kx + 1.2])
             y_vals.extend([ky - 1.6, ky])
     
@@ -503,6 +511,7 @@ def aktualisiere_plot(system, ax, canvas):
         fig.delaxes(extra_ax)
     ax.clear()
     ueberhoehung = 100
+    ueberhoehung = system.get('ueberhoehung', 100)  # Holt den Wert aus dem System, Standard ist 100
     if system.get('berechnet', False):
         ax.set_position([0.07, 0.12, 0.76, 0.78])
     else:
@@ -555,8 +564,8 @@ def aktualisiere_plot(system, ax, canvas):
     # 2. Knoten zeichnen
     for n_id, coords in system.get('knoten', {}).items():
         if system.get('berechnet', False):
-            x = coords[0] + (system['verschiebungen'][(n_id-1)*2] / 1000) * 100
-            y = coords[1] + (system['verschiebungen'][(n_id-1)*2+1] / 1000) * 100
+            x = coords[0] + (system['verschiebungen'][(n_id-1)*2] / 1000) * ueberhoehung
+            y = coords[1] + (system['verschiebungen'][(n_id-1)*2+1] / 1000) * ueberhoehung
         else:
             x, y = coords[0], coords[1]
             
@@ -598,6 +607,10 @@ def aktualisiere_plot(system, ax, canvas):
         if n_id not in system['knoten']: continue
         kx, ky = system['knoten'][n_id]
         
+        if system.get('berechnet', False):
+            kx += (system['verschiebungen'][(n_id-1)*2] / 1000) * ueberhoehung
+            ky += (system['verschiebungen'][(n_id-1)*2+1] / 1000) * ueberhoehung
+            
         w = 1.0  # Breite des Dreiecks
         h = 1.0  # Höhe des Dreiecks
         
@@ -667,6 +680,21 @@ def toggle_nummern(system, ax, canvas, status_label):
         status_label.config(text=f"Status: Fehler! Anzeige nicht sinnvoll (Zu viele Stäbe: {anzahl_elemente}).")
         return
     system['zeige_nummern'] = not system.get('zeige_nummern', False)
+    aktualisiere_plot(system, ax, canvas)
+
+def toggle_ueberhoehung(system, ax, canvas, status_label):
+    if not system.get('berechnet', False):
+        status_label.config(text="Status: Hinweis! Bitte zuerst das System berechnen.")
+        return
+    
+    aktuelle_ueberhoehung = system.get('ueberhoehung', 100)
+    if aktuelle_ueberhoehung != 1:
+        system['ueberhoehung'] = 1
+        status_label.config(text="Status: Überhöhung deaktiviert (Maßstab 1:1).")
+    else:
+        system['ueberhoehung'] = 100
+        status_label.config(text="Status: Überhöhung aktiviert (Faktor 100).")
+        
     aktualisiere_plot(system, ax, canvas)
     
 def knoten_uebernehmen(entries_knoten, system, ax, canvas, status_label, tab_elemente=None, tab_lager=None):
@@ -970,8 +998,11 @@ def starte_gui():
         'name': 'Kein System geladen', 'e_modul': 0.0, 'streckgrenze': 0.0, 
         'sicherheit': 1.0, 'flaeche': 0.0, 'knoten': {}, 'elemente': [], 
         'lasten': [], 'lager': [], 'element_flaechen': [], 'zeige_nummern': False,
-        'zeige_querschnitte': False, 'querschnitte_optimiert': False
-    }
+        'zeige_querschnitte': False, 'querschnitte_optimiert': False,
+        'lasten': [], 'lager': [], 'element_flaechen': [], 'ueberhoehung': 100,
+        'zeige_nummern': False, 'zeige_querschnitte': False, 
+        'querschnitte_optimiert': False
+        }
     entries_knoten = {}
     entries_lasten = []
     # --- 2. Grid-Layout für das 1/4 zu 3/4 Verhältnis konfigurieren ---
@@ -1017,6 +1048,14 @@ def starte_gui():
                                "Umschalten der Nummern fehlgeschlagen"
                            ))
     btn_toggle.pack(fill=tk.X, pady=(0, 15))
+    
+    btn_ueberhoehung = tk.Button(left_frame, text="Überhöhung Ein/Aus", bg="white", 
+                           command=lambda: sichere_aktion(
+                               status_label,
+                               lambda: toggle_ueberhoehung(system_daten, ax, canvas, status_label),
+                               "Umschalten der Überhöhung fehlgeschlagen"
+                           ))
+    btn_ueberhoehung.pack(fill=tk.X, pady=(0, 15))
 
     fig, ax = plt.subplots(figsize=(6, 5))
     canvas = FigureCanvasTkAgg(fig, master=right_frame)
