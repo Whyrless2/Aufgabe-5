@@ -558,8 +558,14 @@ def aktualisiere_plot(system, ax, canvas):
             ax.plot([n1[0], n2[0]], [n1[1], n2[1]], color='lightgray', linestyle='--', lw=1, zorder=0)
             ax.plot([x1, x2], [y1, y2], color=color, lw=2.5, zorder=1)
             
+            mitte_x, mitte_y = (x1 + x2) / 2, (y1 + y2) / 2
         else:
             ax.plot([n1[0], n2[0]], [n1[1], n2[1]], 'b-', lw=1.5, zorder=1)
+            mitte_x, mitte_y = (n1[0] + n2[0]) / 2, (n1[1] + n2[1]) / 2
+
+        if system.get('zeige_nummern_staebe', False):
+            ax.text(mitte_x, mitte_y, str(idx + 1), fontsize=8, color='blue', zorder=5, 
+                    bbox=dict(facecolor='white', edgecolor='none', alpha=0.7, pad=1))
 
     # 2. Knoten zeichnen
     for n_id, coords in system.get('knoten', {}).items():
@@ -680,6 +686,17 @@ def toggle_nummern(system, ax, canvas, status_label):
         status_label.config(text=f"Status: Fehler! Anzeige nicht sinnvoll (Zu viele Stäbe: {anzahl_elemente}).")
         return
     system['zeige_nummern'] = not system.get('zeige_nummern', False)
+    aktualisiere_plot(system, ax, canvas)
+
+def toggle_nummern_staebe(system, ax, canvas, status_label):
+    anzahl_elemente = len(system.get('elemente', []))
+    if anzahl_elemente == 0:
+        status_label.config(text="Status: Fehler! Kein System geladen.")
+        return
+    if anzahl_elemente > 80:
+        status_label.config(text=f"Status: Fehler! Anzeige nicht sinnvoll (Zu viele Stäbe: {anzahl_elemente}).")
+        return
+    system['zeige_nummern_staebe'] = not system.get('zeige_nummern_staebe', False)
     aktualisiere_plot(system, ax, canvas)
 
 def toggle_ueberhoehung(system, ax, canvas, status_label):
@@ -1000,7 +1017,7 @@ def starte_gui():
         'lasten': [], 'lager': [], 'element_flaechen': [], 'zeige_nummern': False,
         'zeige_querschnitte': False, 'querschnitte_optimiert': False,
         'lasten': [], 'lager': [], 'element_flaechen': [], 'ueberhoehung': 100,
-        'zeige_nummern': False, 'zeige_querschnitte': False, 
+        'zeige_nummern': False, 'zeige_nummern_staebe': False, 'zeige_querschnitte': False, 
         'querschnitte_optimiert': False
         }
     entries_knoten = {}
@@ -1041,21 +1058,29 @@ def starte_gui():
                         ))
     btn_opt.pack(fill=tk.X, pady=(0, 15))
 
-    btn_toggle = tk.Button(left_frame, text="Nummern Ein/Aus", bg="white", 
-                           command=lambda: sichere_aktion(
-                               status_label,
-                               lambda: toggle_nummern(system_daten, ax, canvas, status_label),
-                               "Umschalten der Nummern fehlgeschlagen"
-                           ))
-    btn_toggle.pack(fill=tk.X, pady=(0, 15))
+    btn_optionen = tk.Menubutton(left_frame, text="Optionen für Plotting ▼", bg="white", relief=tk.RAISED, width=30)
+    menu_optionen = tk.Menu(btn_optionen, tearoff=0)
+    btn_optionen.config(menu=menu_optionen)
     
-    btn_ueberhoehung = tk.Button(left_frame, text="Überhöhung Ein/Aus", bg="white", 
-                           command=lambda: sichere_aktion(
-                               status_label,
-                               lambda: toggle_ueberhoehung(system_daten, ax, canvas, status_label),
-                               "Umschalten der Überhöhung fehlgeschlagen"
-                           ))
-    btn_ueberhoehung.pack(fill=tk.X, pady=(0, 15))
+    menu_optionen.add_command(
+        label="Numerierung Knoten Ein/Aus",
+        command=lambda: sichere_aktion(
+            status_label, lambda: toggle_nummern(system_daten, ax, canvas, status_label), "Umschalten der Nummern fehlgeschlagen"
+        )
+    )
+    menu_optionen.add_command(
+        label="Numerierung Stäbe Ein/Aus",
+        command=lambda: sichere_aktion(
+            status_label, lambda: toggle_nummern_staebe(system_daten, ax, canvas, status_label), "Umschalten der Stabnummern fehlgeschlagen"
+        )
+    )
+    menu_optionen.add_command(
+        label="Überhöhung Ein/Aus",
+        command=lambda: sichere_aktion(
+            status_label, lambda: toggle_ueberhoehung(system_daten, ax, canvas, status_label), "Umschalten der Überhöhung fehlgeschlagen"
+        )
+    )
+    btn_optionen.pack(fill=tk.X, pady=(0, 15))
 
     fig, ax = plt.subplots(figsize=(6, 5))
     canvas = FigureCanvasTkAgg(fig, master=right_frame)
