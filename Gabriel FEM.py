@@ -271,9 +271,49 @@ def starte_berechnung(system, status_label, ax, canvas, tab_elemente=None):
             aktualisiere_elemente_tab(tab_elemente, system)
         aktualisiere_plot(system, ax, canvas)
         
-        max_u = np.max(np.abs(system['verschiebungen']))
-        max_util = max(system.get('bar_utilization', [0.0])) * 100
-        status_label.config(text=f"Status: FEM-Berechnung erfolgreich! Max. Verschiebung: {max_u:.2f} mm, max. Ausnutzung: {max_util:.1f}%. Werte stehen im Tab Elemente.")
+        # Detaillierte maximale Verschiebung finden
+        verschiebungen = system.get('verschiebungen', np.array([]))
+        max_u_val = 0.0
+        max_u_info = "0.00 mm"
+        if verschiebungen.size > 0:
+            max_u_val = np.max(np.abs(verschiebungen))
+            max_u_idx = np.argmax(np.abs(verschiebungen))
+            max_u_node = (max_u_idx // 2) + 1
+            max_u_dir = "Y" if max_u_idx % 2 else "X"
+            direction_str = "positiver" if verschiebungen[max_u_idx] >= 0 else "negativer"
+            max_u_info = f"{max_u_val:.2f} mm bei Knoten {max_u_node} in {direction_str} {max_u_dir}-Richtung"
+        
+        # Maximale Ausnutzungen finden
+        stress_utils = system.get('bar_utilization', [0.0])
+        stability_utils = system.get('bar_stability_utilization', [0.0])
+        total_utils = [max(s, b) for s, b in zip(stress_utils, stability_utils)] if stress_utils and stability_utils else []
+        
+        max_total_util, max_stress_util, max_stability_util = 0.0, 0.0, 0.0
+        max_util_element, max_stress_element, max_stability_element = "N/A", "N/A", "N/A"
+
+        if total_utils:
+            max_total_util = max(total_utils)
+            max_util_element = np.argmax(total_utils) + 1
+        
+        if stress_utils:
+            max_stress_util = max(stress_utils)
+            max_stress_element = np.argmax(stress_utils) + 1
+
+        if stability_utils and any(stability_utils):
+            max_stability_util = max(stability_utils)
+            max_stability_element = np.argmax(stability_utils) + 1
+
+        status_label.config(text=f"Status: FEM-Berechnung erfolgreich! Max. Verschiebung: {max_u_val:.2f} mm, max. Ausnutzung: {max_total_util*100:.1f}%.")
+        
+        # Pop-up Fenster mit den wichtigsten Ergebnissen
+        messagebox.showinfo(
+            "Berechnungsergebnis",
+            ("FEM-Berechnung erfolgreich!\n\n"
+             f"Maximale Verschiebung: {max_u_info}\n\n"
+             f"Maximale Spannungsausnutzung: {max_stress_util * 100:.1f} % bei Stab {max_stress_element}\n"
+             f"Maximale Knickausnutzung: {max_stability_util * 100:.1f} % bei Stab {max_stability_element}\n"
+             f"-> Höchste Gesamtausnutzung: {max_total_util * 100:.1f} % bei Stab {max_util_element}")
+        )
     except Exception as e:
         status_label.config(text=f"Status: Rechenfehler ({str(e)})") 
 
@@ -301,7 +341,17 @@ def system_volumenkennwert(system, flaechen):
 
 
 def optimierungsbericht(system, original, optimiert, ersparnis, min_area, max_area):
-    max_u = max(abs(v) for v in system.get('verschiebungen', [0.0]))
+    # Detaillierte maximale Verschiebung finden
+    verschiebungen = system.get('verschiebungen', np.array([]))
+    max_u_info = "0.00 mm"
+    if verschiebungen.size > 0:
+        max_u_val = np.max(np.abs(verschiebungen))
+        max_u_idx = np.argmax(np.abs(verschiebungen))
+        max_u_node = (max_u_idx // 2) + 1
+        max_u_dir = "Y" if max_u_idx % 2 else "X"
+        direction_str = "positiver" if verschiebungen[max_u_idx] >= 0 else "negativer"
+        max_u_info = f"{max_u_val:.2f} mm bei Knoten {max_u_node} in {direction_str} {max_u_dir}-Richtung"
+
     max_spannung = max(system.get('bar_utilization', [0.0])) * 100
     max_knicken = max(system.get('bar_stability_utilization', [0.0])) * 100
     kritisch_spannung = int(np.argmax(system.get('bar_utilization', [0.0]))) + 1
@@ -315,7 +365,7 @@ def optimierungsbericht(system, original, optimiert, ersparnis, min_area, max_ar
         f"Volumenkennwert vorher: {original:,.0f} mm³\n"
         f"Volumenkennwert optimiert: {optimiert:,.0f} mm³\n"
         f"Materialersparnis: {ersparnis:.1f} %\n\n"
-        f"Maximale Verschiebung: {max_u:.2f} mm\n"
+        f"Maximale Verschiebung: {max_u_info}\n"
         f"Maximale Spannungsausnutzung: {max_spannung:.1f} % bei Stab {kritisch_spannung}\n"
         f"Maximale Knickausnutzung: {max_knicken:.1f} % bei Stab {kritisch_knicken}"
     )
@@ -403,13 +453,13 @@ def datei_waehlen_und_laden(system, entries, ax, canvas, status_label, tab_knote
     data = [line.split('#')[0].strip() for line in lines if line.split('#')[0].strip()]
     
     try:
-        system['name'] = data[0]
-        system['e_modul'] = float(data[1])
-        system['streckgrenze'] = float(data[2])
-        system['sicherheit'] = float(data[3])
-        system['flaeche'] = float(data[4])
+        system['name'] = filename.split('/')[-1].replace('.txt', '') # Use filename as title
+        system['e_modul'] = float(data[0])
+        system['streckgrenze'] = float(data[1])
+        system['sicherheit'] = float(data[2])
+        system['flaeche'] = float(data[3])
         
-        current_idx = 5
+        current_idx = 4
         num_nodes = int(data[current_idx])
         system['knoten'] = {}
         current_idx += 1
@@ -510,8 +560,8 @@ def aktualisiere_plot(system, ax, canvas):
     for extra_ax in fig.axes[1:]:
         fig.delaxes(extra_ax)
     ax.clear()
-    ueberhoehung = 100
-    ueberhoehung = system.get('ueberhoehung', 100)  # Holt den Wert aus dem System, Standard ist 100
+    ueberhoehung = 50
+    ueberhoehung = system.get('ueberhoehung', 10)  # Holt den Wert aus dem System, Standard ist 10
     if system.get('berechnet', False):
         ax.set_position([0.07, 0.12, 0.76, 0.78])
     else:
@@ -521,11 +571,36 @@ def aktualisiere_plot(system, ax, canvas):
     ax.set_ylabel('Y [m]')
     ax.grid(True, linestyle='--', alpha=0.3)
     
+    # No-Go-Zonen (8 Kreise, D=3m) bei y=5m zeichnen
+    if system.get('zeige_nogo_zonen', False):
+        no_go_zones = [
+            (3, 5), (8, 5), (13, 5), (18, 5),
+            (32, 5), (37, 5), (42, 5), (47, 5)
+        ]
+        radius = 1.5  # Durchmesser ist 3m
+
+        for center in no_go_zones:
+            # "opague grey" wird als gefülltes, halb-transparentes Grau interpretiert
+            circle = patches.Circle(center, radius, color='gray', alpha=0.4, zorder=0)
+            ax.add_patch(circle)
+    
     stress_cmap = LinearSegmentedColormap.from_list(
         "belastung_blau_gelb_rot",
         [(0.0, "#1f77b4"), (0.5, "#ffd92f"), (1.0, "#d7191c")]
     )
-    norm = Normalize(vmin=0.0, vmax=1.0)
+
+    vmax_util = 1.0
+    if system.get('berechnet', False) and not system.get('zeige_querschnitte', False):
+        stress_utils = system.get('bar_utilization', [])
+        stability_utils = system.get('bar_stability_utilization', [])
+        if stress_utils and stability_utils and len(stress_utils) == len(stability_utils):
+            total_utils = [max(s, b) for s, b in zip(stress_utils, stability_utils)]
+            if total_utils:
+                max_found_util = max(total_utils)
+                # Set vmax to the max found utilization, but at least a small value
+                vmax_util = max(max_found_util, 1e-9)
+
+    norm = Normalize(vmin=0.0, vmax=vmax_util)
     area_cmap = LinearSegmentedColormap.from_list(
         "querschnitt_blau_gelb_rot",
         [(0.0, "#1f77b4"), (0.5, "#ffd92f"), (1.0, "#d7191c")]
@@ -551,8 +626,10 @@ def aktualisiere_plot(system, ax, canvas):
             if system.get('zeige_querschnitte', False):
                 color = area_cmap(area_norm(element_flaeche(system, idx)))
             else:
-                utilization = system.get('bar_utilization', [0.0] * len(system.get('elemente', [])))[idx]
-                color = stress_cmap(norm(min(utilization, 1.0)))
+                stress_util = system.get('bar_utilization', [0.0] * len(system.get('elemente', [])))[idx]
+                stability_util = system.get('bar_stability_utilization', [0.0] * len(system.get('elemente', [])))[idx]
+                total_util = max(stress_util, stability_util)
+                color = stress_cmap(norm(total_util))
             
             # Gestrichelt = Unverformt, Durchgezogen = Verformt
             ax.plot([n1[0], n2[0]], [n1[1], n2[1]], color='lightgray', linestyle='--', lw=1, zorder=0)
@@ -704,16 +781,25 @@ def toggle_ueberhoehung(system, ax, canvas, status_label):
         status_label.config(text="Status: Hinweis! Bitte zuerst das System berechnen.")
         return
     
-    aktuelle_ueberhoehung = system.get('ueberhoehung', 100)
+    aktuelle_ueberhoehung = system.get('ueberhoehung', 10)
     if aktuelle_ueberhoehung != 1:
         system['ueberhoehung'] = 1
         status_label.config(text="Status: Überhöhung deaktiviert (Maßstab 1:1).")
     else:
-        system['ueberhoehung'] = 100
-        status_label.config(text="Status: Überhöhung aktiviert (Faktor 100).")
+        system['ueberhoehung'] = 10
+        status_label.config(text="Status: Überhöhung aktiviert (Faktor 10).")
         
     aktualisiere_plot(system, ax, canvas)
     
+def toggle_nogo_zonen(system, ax, canvas, status_label):
+    system['zeige_nogo_zonen'] = not system.get('zeige_nogo_zonen', False)
+    if system['zeige_nogo_zonen']:
+        status_label.config(text="Status: Anzeige der No-Go-Zonen aktiviert.")
+    else:
+        status_label.config(text="Status: Anzeige der No-Go-Zonen deaktiviert.")
+    aktualisiere_plot(system, ax, canvas)
+
+
 def knoten_uebernehmen(entries_knoten, system, ax, canvas, status_label, tab_elemente=None, tab_lager=None):
     """Liest die geänderten X- und Y-Werte aus dem GUI-Tab und aktualisiert das System."""
     try:
@@ -1016,7 +1102,7 @@ def starte_gui():
         'sicherheit': 1.0, 'flaeche': 0.0, 'knoten': {}, 'elemente': [], 
         'lasten': [], 'lager': [], 'element_flaechen': [], 'zeige_nummern': False,
         'zeige_querschnitte': False, 'querschnitte_optimiert': False,
-        'lasten': [], 'lager': [], 'element_flaechen': [], 'ueberhoehung': 100,
+        'lasten': [], 'lager': [], 'element_flaechen': [], 'ueberhoehung': 10,
         'zeige_nummern': False, 'zeige_nummern_staebe': False, 'zeige_querschnitte': False, 
         'querschnitte_optimiert': False
         }
@@ -1078,6 +1164,12 @@ def starte_gui():
         label="Überhöhung Ein/Aus",
         command=lambda: sichere_aktion(
             status_label, lambda: toggle_ueberhoehung(system_daten, ax, canvas, status_label), "Umschalten der Überhöhung fehlgeschlagen"
+        )
+    )
+    menu_optionen.add_command(
+        label="No-Go-Zonen Ein/Aus",
+        command=lambda: sichere_aktion(
+            status_label, lambda: toggle_nogo_zonen(system_daten, ax, canvas, status_label), "Umschalten der No-Go-Zonen fehlgeschlagen"
         )
     )
     btn_optionen.pack(fill=tk.X, pady=(0, 15))

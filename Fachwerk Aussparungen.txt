@@ -1,0 +1,114 @@
+210000.0        # E-Modul in N/mm2
+240             # Streckgrenze in N/mm2
+1.5             # Sicherheit
+70000.0         # Querschnittsflaeche in mm2
+32              # Anzahl Knoten
+0 0             # Knoten 1 (Festlager, x=0)
+5.5 0           # Knoten 2 (Luecke nach Kreis 1)
+10.5 0          # Knoten 3 (Luecke nach Kreis 2)
+15.5 0          # Knoten 4 (Luecke nach Kreis 3)
+20.5 0          # Knoten 5 (Luecke nach Kreis 4)
+25 0            # Knoten 6 (Brueckenmitte)
+29.5 0          # Knoten 7 (Luecke vor Kreis 5)
+34.5 0          # Knoten 8 (Luecke vor Kreis 6)
+39.5 0          # Knoten 9 (Luecke vor Kreis 7)
+44.5 0          # Knoten 10 (Luecke vor Kreis 8)
+50 0            # Knoten 11 (Loslager, x=50)
+0 10            # Knoten 12 (Obergurt)
+5.5 10          # Knoten 13
+10.5 10         # Knoten 14
+15.5 10         # Knoten 15
+20.5 10         # Knoten 16
+25 10           # Knoten 17
+29.5 10         # Knoten 18
+34.5 10         # Knoten 19
+39.5 10         # Knoten 20
+44.5 10         # Knoten 21
+50 10           # Knoten 22
+0 5             # Knoten 23 (Mittelknoten fuer K-Diagonalen)
+5.5 5           # Knoten 24
+10.5 5          # Knoten 25
+15.5 5          # Knoten 26
+20.5 5          # Knoten 27
+29.5 5          # Knoten 28
+34.5 5          # Knoten 29
+39.5 5          # Knoten 30
+44.5 5          # Knoten 31
+50 5            # Knoten 32
+61              # Anzahl Elemente
+1 2
+2 3
+3 4
+4 5
+5 6
+6 7
+7 8
+8 9
+9 10
+10 11
+12 13
+13 14
+14 15
+15 16
+16 17
+17 18
+18 19
+19 20
+20 21
+21 22
+1 23
+23 12
+2 24
+24 13
+3 25
+25 14
+4 26
+26 15
+5 27
+27 16
+6 17
+7 28
+28 18
+8 29
+29 19
+9 30
+30 20
+10 31
+31 21
+11 32
+32 22
+2 23
+13 23
+3 24
+14 24
+4 25
+15 25
+5 26
+16 26
+6 27
+17 27
+6 28
+17 28
+7 29
+18 29
+8 30
+19 30
+9 31
+20 31
+10 32
+21 32
+11              # Anzahl Knoten mit Lasten
+1 500000 -49050
+2 0 -98100
+3 0 -98100
+4 0 -98100
+5 0 -98100
+6 0 -98100
+7 0 -98100
+8 0 -98100
+9 0 -98100
+10 0 -98100
+11 0 -49050
+2               # Anzahl Lager
+1 1 1
+11 0 1
